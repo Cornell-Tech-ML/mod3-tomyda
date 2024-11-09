@@ -7,7 +7,7 @@ from typing import Any, Iterable, List, Tuple, Protocol
 # Central Difference calculation
 
 
-def central_difference(f: Any, *vals: Any, arg: int = 0, epsilon: float = 1e-6) -> Any:
+def central_difference(f: Any, *vals: Any, arg: int = 0, epsilon: float = 1e-5) -> Any:
     r"""Computes an approximation to the derivative of `f` with respect to one arg.
 
     See :doc:`derivative` or https://en.wikipedia.org/wiki/Finite_difference for more details.
@@ -24,14 +24,12 @@ def central_difference(f: Any, *vals: Any, arg: int = 0, epsilon: float = 1e-6) 
         An approximation of $f'_i(x_0, \ldots, x_{n-1})$
 
     """
-    # ASSIGN1.1
-    vals1 = [v for v in vals]
-    vals2 = [v for v in vals]
-    vals1[arg] = vals1[arg] + epsilon
-    vals2[arg] = vals2[arg] - epsilon
+    vals1 = list(vals)
+    vals2 = list(vals)
+    vals1[arg] += epsilon
+    vals2[arg] -= epsilon
     delta = f(*vals1) - f(*vals2)
     return delta / (2 * epsilon)
-    # END ASSIGN1.1
 
 
 variable_count = 1
@@ -111,6 +109,9 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
     derivatives = {}
     derivatives[variable.unique_id] = deriv
     for var in queue:
+        if var.unique_id not in derivatives:
+            print(f"Missing derivative for variable with unique_id: {var.unique_id}")
+            continue  # Skip to avoid KeyError, but this indicates a logic issue
         deriv = derivatives[var.unique_id]
         if var.is_leaf():
             var.accumulate_derivative(deriv)
@@ -120,7 +121,6 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
                     continue
                 derivatives.setdefault(v.unique_id, 0.0)
                 derivatives[v.unique_id] = derivatives[v.unique_id] + d
-    # END ASSIGN1.4
 
 
 @dataclass

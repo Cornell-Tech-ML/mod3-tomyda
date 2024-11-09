@@ -169,24 +169,24 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        if (
-            len(out_strides != len(in_strides))
-            or (out_strides != in_strides).any()
-            or (out_shape != in_shape).any()
-        ):
+        same_shape = len(out_shape) == len(in_shape) and np.all(out_shape == in_shape)
+        same_strides = len(out_strides) == len(in_strides) and np.all(
+            out_strides == in_strides
+        )
+        if same_shape and same_strides:
             for i in prange(len(out)):
-                out_index: Index = np.empty(MAX_DIMS, np.int32)
-                in_index: Index = np.empty(MAX_DIMS, np.int32)
+                out[i] = fn(in_storage[i])
+        else:
+            for i in prange(len(out)):
+                out_index = np.empty(MAX_DIMS, dtype=np.int32)
+                in_index = np.empty(MAX_DIMS, dtype=np.int32)
                 to_index(i, out_shape, out_index)
                 broadcast_index(out_index, out_shape, in_shape, in_index)
                 o = index_to_position(out_index, out_strides)
                 j = index_to_position(in_index, in_strides)
                 out[o] = fn(in_storage[j])
-            else:
-                for i in prange(len(out)):
-                    out[i] = fn(in_storage[i])
 
-    return njit(_map, parallel=True)  # type: ignore
+    return njit(_map, parallel=True)
 
 
 def tensor_zip(
@@ -223,18 +223,25 @@ def tensor_zip(
         b_shape: Shape,
         b_strides: Strides,
     ) -> None:
-        if (
-            len(out_strides) != len(a_strides)
-            or len(out_strides) != len(b_strides)
-            or (out_strides != a_strides).any()
-            or (out_strides != b_strides).any()
-            or (out_shape != a_shape).any()
-            or (out_shape != b_shape).any()
-        ):
+        same_shape = (
+            len(out_shape) == len(a_shape) == len(b_shape)
+            and np.all(out_shape == a_shape)
+            and np.all(out_shape == b_shape)
+        )
+        same_strides = (
+            len(out_strides) == len(a_strides) == len(b_strides)
+            and np.all(out_strides == a_strides)
+            and np.all(out_strides == b_strides)
+        )
+        if same_shape and same_strides:
+            # Stride-aligned, process directly
             for i in prange(len(out)):
-                out_index: Index = np.empty(MAX_DIMS, np.int32)
-                a_index: Index = np.empty(MAX_DIMS, np.int32)
-                b_index: Index = np.empty(MAX_DIMS, np.int32)
+                out[i] = fn(a_storage[i], b_storage[i])
+        else:
+            for i in prange(len(out)):
+                out_index = np.empty(MAX_DIMS, dtype=np.int32)
+                a_index = np.empty(MAX_DIMS, dtype=np.int32)
+                b_index = np.empty(MAX_DIMS, dtype=np.int32)
                 to_index(i, out_shape, out_index)
                 o = index_to_position(out_index, out_strides)
                 broadcast_index(out_index, out_shape, a_shape, a_index)
@@ -242,11 +249,8 @@ def tensor_zip(
                 broadcast_index(out_index, out_shape, b_shape, b_index)
                 k = index_to_position(b_index, b_strides)
                 out[o] = fn(a_storage[j], b_storage[k])
-        else:
-            for i in prange(len(out)):
-                out[i] = fn(a_storage[i], b_storage[i])
 
-    return njit(_zip, parallel=True)  # type: ignore
+    return njit(_zip, parallel=True)
 
 
 def tensor_reduce(
