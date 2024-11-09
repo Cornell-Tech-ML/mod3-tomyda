@@ -44,7 +44,10 @@ def index_to_position(index: Index, strides: Strides) -> int:
         Position in storage
 
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    position = 0
+    for idx, stride in zip(index, strides):
+        position += idx * stride
+    return position
 
 
 def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
@@ -59,7 +62,11 @@ def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
         out_index : return index corresponding to position.
 
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    cur_ord = ordinal + 0
+    for i in range(len(shape) - 1, -1, -1):
+        sh = shape[i]
+        out_index[i] = int(cur_ord % sh)
+        cur_ord = cur_ord // sh
 
 
 def broadcast_index(
@@ -81,7 +88,18 @@ def broadcast_index(
         None
 
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    len_big = len(big_shape)
+    len_small = len(shape)
+    offset = len_big - len_small
+    # Pad the smaller shape with ones on the left to match the length of big_shape
+    padded_shape = [1] * offset + list(shape)
+    for i in range(len_big):
+        if padded_shape[i] == 1:
+            # Dimension is broadcasted, index is 0
+            continue
+        else:
+            # Map the index from big_index to out_index
+            out_index[i - offset] = big_index[i]
 
 
 def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
@@ -98,7 +116,17 @@ def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
         IndexingError : if cannot broadcast
 
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    result_shape = []
+    len1, len2 = len(shape1), len(shape2)
+    max_len = max(len1, len2)
+    for i in range(1, max_len + 1):
+        dim1 = shape1[-i] if i <= len1 else 1
+        dim2 = shape2[-i] if i <= len2 else 1
+        if dim1 == dim2 or dim1 == 1 or dim2 == 1:
+            result_shape.append(max(dim1, dim2))
+        else:
+            raise IndexingError(f"Shapes {shape1} and {shape2} are not broadcastable")
+    return tuple(reversed(result_shape))
 
 
 def strides_from_shape(shape: UserShape) -> UserStrides:
@@ -166,9 +194,11 @@ class TensorData:
 
     @staticmethod
     def shape_broadcast(shape_a: UserShape, shape_b: UserShape) -> UserShape:
+        """Broadcast two shapes"""
         return shape_broadcast(shape_a, shape_b)
 
     def index(self, index: Union[int, UserIndex]) -> int:
+        """Convert an index into a position"""
         if isinstance(index, int):
             aindex: Index = array([index])
         else:  # if isinstance(index, tuple):
@@ -192,6 +222,7 @@ class TensorData:
         return index_to_position(array(index), self._strides)
 
     def indices(self) -> Iterable[UserIndex]:
+        """Generate all indices of the tensor"""
         lshape: Shape = array(self.shape)
         out_index: Index = array(self.shape)
         for i in range(self.size):
@@ -203,10 +234,12 @@ class TensorData:
         return tuple((random.randint(0, s - 1) for s in self.shape))
 
     def get(self, key: UserIndex) -> float:
+        """Get the value at a given index"""
         x: float = self._storage[self.index(key)]
         return x
 
     def set(self, key: UserIndex, val: float) -> None:
+        """Set the value at a given index"""
         self._storage[self.index(key)] = val
 
     def tuple(self) -> Tuple[Storage, Shape, Strides]:
@@ -227,7 +260,12 @@ class TensorData:
             range(len(self.shape))
         ), f"Must give a position to each dimension. Shape: {self.shape} Order: {order}"
 
-        raise NotImplementedError("Need to include this file from past assignment.")
+        # Permute the shape and strides according to the order
+        new_shape = tuple(self.shape[i] for i in order)
+        new_strides = tuple(self.strides[i] for i in order)
+
+        # Return a new TensorData instance with the permuted shape and strides
+        return TensorData(self._storage, new_shape, new_strides)
 
     def to_string(self) -> str:
         """Convert to string"""

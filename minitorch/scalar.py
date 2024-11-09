@@ -6,17 +6,18 @@ from typing import Any, Iterable, Optional, Sequence, Tuple, Type, Union
 import numpy as np
 
 from dataclasses import field
+
 from .autodiff import Context, Variable, backpropagate, central_difference
 from .scalar_functions import (
-    EQ,
-    LT,
     Add,
     Exp,
     Inv,
     Log,
+    Lt,
     Mul,
     Neg,
     ReLU,
+    Eq,
     ScalarFunction,
     Sigmoid,
 )
@@ -42,10 +43,7 @@ class ScalarHistory:
     inputs: Sequence[Scalar] = ()
 
 
-# ## Task 1.2 and 1.4
-# Scalar Forward and Backward
-
-_var_count = 0
+_var_count = 0.0
 
 
 @dataclass
@@ -61,11 +59,11 @@ class Scalar:
     history: Optional[ScalarHistory] = field(default_factory=ScalarHistory)
     derivative: Optional[float] = None
     name: str = field(default="")
-    unique_id: int = field(default=0)
+    unique_id: int = field(init=False, default=0)
 
     def __post_init__(self):
         global _var_count
-        _var_count += 1
+        _var_count += 1.0
         object.__setattr__(self, "unique_id", _var_count)
         object.__setattr__(self, "name", str(self.unique_id))
         object.__setattr__(self, "data", float(self.data))
@@ -91,8 +89,6 @@ class Scalar:
     def __rmul__(self, b: ScalarLike) -> Scalar:
         return self * b
 
-    # Variable elements for backprop
-
     def accumulate_derivative(self, x: Any) -> None:
         """Add `val` to the the derivative accumulated on this variable.
         Should only be called during autodifferentiation on leaf variables.
@@ -112,21 +108,24 @@ class Scalar:
         return self.history is not None and self.history.last_fn is None
 
     def is_constant(self) -> bool:
+        """True if this variable was created by an operation (has `last_fn`)"""
         return self.history is None
 
     @property
     def parents(self) -> Iterable[Variable]:
-        """Get the variables used to create this one."""
+        """Get the parent variables of this variable"""
         assert self.history is not None
         return self.history.inputs
 
-    def chain_rule(self, d_output: Any) -> Iterable[Tuple[Variable, Any]]:
+    def chain_rule(self: Scalar, d_output: Any) -> Iterable[Tuple[Variable, Any]]:
+        """Apply the chain rule to get the derivatives of the parent variables"""
         h = self.history
         assert h is not None
         assert h.last_fn is not None
         assert h.ctx is not None
 
-        raise NotImplementedError("Need to include this file from past assignment.")
+        x = h.last_fn._backward(h.ctx, d_output)
+        return list(zip(h.inputs, x))
 
     def backward(self, d_output: Optional[float] = None) -> None:
         """Calls autodiff to fill in the derivatives for the history of this object.
@@ -141,7 +140,43 @@ class Scalar:
             d_output = 1.0
         backpropagate(self, d_output)
 
-    raise NotImplementedError("Need to include this file from past assignment.")
+    def __add__(self, other: ScalarLike) -> Scalar:
+        other = other if isinstance(other, Scalar) else Scalar(other)
+        return Add.apply(self, other)
+
+    def __lt__(self, other: ScalarLike) -> Scalar:
+        other = other if isinstance(other, Scalar) else Scalar(other)
+        return Lt.apply(self, other)
+
+    def __gt__(self, other: ScalarLike) -> Scalar:
+        other = other if isinstance(other, Scalar) else Scalar(other)
+        return Lt.apply(other, self)
+
+    def __eq__(self, other: ScalarLike) -> Scalar:
+        other = other if isinstance(other, Scalar) else Scalar(other)
+        return Eq.apply(self, other)
+
+    def __sub__(self, other: ScalarLike) -> Scalar:
+        return Add.apply(self, -other)
+
+    def __neg__(self) -> Scalar:
+        return Neg.apply(self)
+
+    def log(self) -> Scalar:
+        """Logarithm function f(x) = log(x)"""
+        return Log.apply(self)
+
+    def exp(self) -> Scalar:
+        """Exponential function f(x) = exp(x)"""
+        return Exp.apply(self)
+
+    def sigmoid(self) -> Scalar:
+        """Sigmoid function f(x) = 1 / (1 + exp(-x))"""
+        return Sigmoid.apply(self)
+
+    def relu(self) -> Scalar:
+        """ReLU function f(x) = max(0, x)"""
+        return ReLU.apply(self)
 
 
 def derivative_check(f: Any, *scalars: Scalar) -> None:
@@ -150,14 +185,18 @@ def derivative_check(f: Any, *scalars: Scalar) -> None:
 
     Parameters
     ----------
-        f : function from n-scalars to 1-scalar.
-        *scalars  : n input scalar values.
+    f : function
+        A function from n-scalars to 1-scalar.
+    *scalars : Scalar
+        n input scalar values.
 
     """
+    print(f"\n{f}")
     out = f(*scalars)
     out.backward()
 
     err_msg = """
+
 Derivative check at arguments f(%s) and received derivative f'=%f for argument %d,
 but was expecting derivative f'=%f from central difference."""
     for i, x in enumerate(scalars):
