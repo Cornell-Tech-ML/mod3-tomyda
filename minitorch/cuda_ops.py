@@ -265,9 +265,7 @@ def _sum_practice(out: Storage, a: Storage, size: int) -> None:
         size (int): length of `a`.
 
     """
-    BLOCK_DIM = THREADS_PER_BLOCK
-
-    cache = cuda.shared.array(BLOCK_DIM, numba.float64)
+    cache = cuda.shared.array(shape=(THREADS_PER_BLOCK,), dtype=numba.float64)
     i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
     tid = cuda.threadIdx.x
 
@@ -370,7 +368,7 @@ def tensor_reduce(
             total = fn(total, a_storage[in_pos])
 
         # Allocate shared memory for partial results
-        cache = cuda.shared.array(BLOCK_DIM, numba.float64)
+        cache = cuda.shared.array(shape=(THREADS_PER_BLOCK,), dtype=numba.float64)
         cache[pos] = total
         cuda.syncthreads()
 
