@@ -88,18 +88,12 @@ def broadcast_index(
         None
 
     """
-    len_big = len(big_shape)
-    len_small = len(shape)
-    offset = len_big - len_small
-    # Pad the smaller shape with ones on the left to match the length of big_shape
-    padded_shape = [1] * offset + list(shape)
-    for i in range(len_big):
-        if padded_shape[i] == 1:
-            # Dimension is broadcasted, index is 0
-            continue
+    for i, s in enumerate(shape):
+        if s > 1:
+            out_index[i] = big_index[i + (len(big_shape) - len(shape))]
         else:
-            # Map the index from big_index to out_index
-            out_index[i - offset] = big_index[i]
+            out_index[i] = 0
+    return None
 
 
 def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
