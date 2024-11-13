@@ -265,28 +265,31 @@ def _sum_practice(out: Storage, a: Storage, size: int) -> None:
         size (int): length of `a`.
 
     """
-    BLOCK_DIM = 32
+    BLOCK_DIM = THREADS_PER_BLOCK
 
     cache = cuda.shared.array(BLOCK_DIM, numba.float64)
     i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
-    pos = cuda.threadIdx.x
+    tid = cuda.threadIdx.x
 
-    if i >= size:
-        cache[pos] = 0
+    # Load data into shared memory
+    if i < size:
+        cache[tid] = a[i]
     else:
-        cache[pos] = a[i]
+        cache[tid] = 0.0
+
     cuda.syncthreads()
 
-    if i < size:
-        z = 2
-        for _ in range(5):
-            if (pos % z) == 0:
-                cache[pos] += cache[pos + int(z / 2)]
-                cuda.syncthreads()
-            z *= 2
-        if pos == 0:
-            y = cuda.blockIdx.x
-            out[y] = cache[0]
+    # Perform reduction in shared memory
+    stride = cuda.blockDim.x // 2
+    while stride > 0:
+        if tid < stride:
+            cache[tid] += cache[tid + stride]
+        cuda.syncthreads()
+        stride //= 2
+
+    # Write result to output
+    if tid == 0:
+        out[cuda.blockIdx.x] = cache[0]
 
 
 jit_sum_practice = cuda.jit()(_sum_practice)
@@ -296,12 +299,11 @@ def sum_practice(a: Tensor) -> TensorData:
     """Perform a practice sum operation on a tensor using CUDA."""
     (size,) = a.shape
     threadsperblock = THREADS_PER_BLOCK
-    blockspergrid = (size + THREADS_PER_BLOCK - 1) // THREADS_PER_BLOCK
-    out_size = blockspergrid
-    out = TensorData([0.0 for _ in range(out_size)], (out_size,))
+    blockspergrid = (size // THREADS_PER_BLOCK) + 1
+    out = TensorData([0.0 for i in range(2)], (2,))
     out.to_cuda_()
     jit_sum_practice[blockspergrid, threadsperblock](
-        out._storage, a._tensor._storage, size
+        out.tuple()[0], a._tensor._storage, size
     )
     return out
 
