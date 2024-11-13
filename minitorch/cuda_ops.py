@@ -323,7 +323,6 @@ def tensor_reduce(
 
     """
 
-    @cuda.jit()
     def _reduce(
         out: Storage,
         out_shape: Shape,
@@ -335,58 +334,41 @@ def tensor_reduce(
         reduce_dim: int,
         reduce_value: float,
     ) -> None:
-        BLOCK_DIM = cuda.blockDim.x
-        pos = cuda.threadIdx.x
+        BLOCK_DIM = 1024
+        cache = cuda.shared.array(BLOCK_DIM, numba.float64)
+        out_index = cuda.local.array(MAX_DIMS, numba.int32)
         out_pos = cuda.blockIdx.x
 
-        if out_pos >= out_size:
-            return
-
-        # Initialize index arrays
-        out_index = cuda.local.array(MAX_DIMS, numba.int32)
-        in_index = cuda.local.array(MAX_DIMS, numba.int32)
-
-        # Convert linear index to multidimensional index
-        to_index(out_pos, out_shape, out_index)
-
-        # Initialize accumulator
-        total = reduce_value
-
-        # Get the size along the reduction dimension
-        reduce_dim_size = a_shape[reduce_dim]
-
-        # Iterate over the reduction dimension in steps of BLOCK_DIM
-        for s in range(pos, reduce_dim_size, BLOCK_DIM):
-            # Copy out_index to in_index
-            for d in range(len(out_shape)):
-                in_index[d] = out_index[d]
-            in_index[reduce_dim] = s
-
-            # Compute input position
-            in_pos = index_to_position(in_index, a_strides)
-
-            # Accumulate the reduction
-            total = fn(total, a_storage[in_pos])
-
-        # Allocate shared memory for partial results
+        BLOCK_DIM = 1024
         cache = cuda.shared.array(BLOCK_DIM, numba.float64)
-        cache[pos] = total
-        cuda.syncthreads()
+        out_index = cuda.local.array(MAX_DIMS, numba.int32)
+        out_pos = cuda.blockIdx.x
+        pos = cuda.threadIdx.x
 
-        # Perform parallel reduction within the block
-        stride = BLOCK_DIM // 2
-        while stride > 0:
-            if pos < stride:
-                cache[pos] = fn(cache[pos], cache[pos + stride])
-            cuda.syncthreads()
-            stride //= 2
+        cache[pos] = reduce_value
 
-        # Write the result to the output tensor
-        if pos == 0:
-            out_position = index_to_position(out_index, out_strides)
-            out[out_position] = cache[0]
+        if out_pos < out_size:
+            to_index(out_pos, out_shape, out_index)
+            pos2 = index_to_position(out_index, out_strides)
+            idx_to_be_reduced = out_index[reduce_dim]
+            global_idx = pos + idx_to_be_reduced * BLOCK_DIM
 
-    return _reduce  # type: ignore
+            out_index[reduce_dim] = global_idx
+
+            if global_idx < a_shape[reduce_dim]:
+                cache[pos] = a_storage[index_to_position(out_index, a_strides)]
+                cuda.syncthreads()
+
+                n = 1
+                while n < BLOCK_DIM:
+                    if pos % (2 * n) == 0:
+                        cache[pos] = fn(cache[pos], cache[pos + n])
+                        cuda.syncthreads()
+                    n *= 2
+            if pos == 0:
+                out[pos2] = cache[0]
+
+    return cuda.jit()(_reduce)  # type: ignore
 
 
 def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
