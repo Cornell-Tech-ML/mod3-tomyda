@@ -173,23 +173,27 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        out_index = cuda.local.array(MAX_DIMS, numba.int32)
-        in_index = cuda.local.array(MAX_DIMS, numba.int32)
-        i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x  # saves indexes
-
-        if i >= 0 and i < out_size:
-            to_index(i, out_shape, out_index)  # retrieves out_idx for pos in storage
-            broadcast_index(
-                out_index, out_shape, in_shape, in_index
-            )  # broadcasts out_index (bigger) to in_idx (smaller shape - input)
-            in_storage_pos = index_to_position(
-                in_index, in_strides
-            )  # get position in storage of in_idx
-            out[i] = fn(in_storage[in_storage_pos])
-        else:
+        i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
+        if i >= out_size:
             return
 
-    return cuda.jit()(_map)  # type: ignore
+        out_index = cuda.local.array(MAX_DIMS, numba.int32)
+        in_index = cuda.local.array(MAX_DIMS, numba.int32)
+
+        # Convert linear index to multidimensional index
+        to_index(i, out_shape, out_index)
+
+        # Handle broadcasting
+        broadcast_index(out_index, out_shape, in_shape, in_index)
+
+        # Compute positions
+        out_pos = index_to_position(out_index, out_strides)
+        in_pos = index_to_position(in_index, in_strides)
+
+        # Apply the function
+        out[out_pos] = fn(in_storage[in_pos])
+
+    return _map  # type: ignore
 
 
 def tensor_zip(
@@ -223,30 +227,26 @@ def tensor_zip(
         b_shape: Shape,
         b_strides: Strides,
     ) -> None:
-        i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
-        if i >= out_size:
-            return
-
         out_index = cuda.local.array(MAX_DIMS, numba.int32)
         a_index = cuda.local.array(MAX_DIMS, numba.int32)
         b_index = cuda.local.array(MAX_DIMS, numba.int32)
+        i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
 
-        # Convert linear index to multidimensional index
-        to_index(i, out_shape, out_index)
+        if i >= 0 and i < out_size:
+            to_index(i, out_shape, out_index)  # to get index of output
+            broadcast_index(
+                out_index, out_shape, a_shape, a_index
+            )  # broadcasts big index (out shape) to smaller (in shape)
+            broadcast_index(out_index, out_shape, b_shape, b_index)
 
-        # Handle broadcasting for both inputs
-        broadcast_index(out_index, out_shape, a_shape, a_index)
-        broadcast_index(out_index, out_shape, b_shape, b_index)
+            in_storage_a_pos = index_to_position(a_index, a_strides)
+            in_storage_b_pos = index_to_position(b_index, b_strides)
 
-        # Compute positions
-        out_pos = index_to_position(out_index, out_strides)
-        a_pos = index_to_position(a_index, a_strides)
-        b_pos = index_to_position(b_index, b_strides)
+            out[i] = fn(a_storage[in_storage_a_pos], b_storage[in_storage_b_pos])
+        else:
+            return
 
-        # Apply the function
-        out[out_pos] = fn(a_storage[a_pos], b_storage[b_pos])
-
-    return _zip  # type: ignore
+    return cuda.jit()(_zip)  # type: ignore
 
 
 def _sum_practice(out: Storage, a: Storage, size: int) -> None:
