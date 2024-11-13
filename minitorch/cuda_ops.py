@@ -173,27 +173,23 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
-        if i >= out_size:
-            return
-
         out_index = cuda.local.array(MAX_DIMS, numba.int32)
         in_index = cuda.local.array(MAX_DIMS, numba.int32)
+        i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x  # saves indexes
 
-        # Convert linear index to multidimensional index
-        to_index(i, out_shape, out_index)
+        if i >= 0 and i < out_size:
+            to_index(i, out_shape, out_index)  # retrieves out_idx for pos in storage
+            broadcast_index(
+                out_index, out_shape, in_shape, in_index
+            )  # broadcasts out_index (bigger) to in_idx (smaller shape - input)
+            in_storage_pos = index_to_position(
+                in_index, in_strides
+            )  # get position in storage of in_idx
+            out[i] = fn(in_storage[in_storage_pos])
+        else:
+            return
 
-        # Handle broadcasting
-        broadcast_index(out_index, out_shape, in_shape, in_index)
-
-        # Compute positions
-        out_pos = index_to_position(out_index, out_strides)
-        in_pos = index_to_position(in_index, in_strides)
-
-        # Apply the function
-        out[out_pos] = fn(in_storage[in_pos])
-
-    return _map  # type: ignore
+    return cuda.jit()(_map)  # type: ignore
 
 
 def tensor_zip(
