@@ -121,10 +121,10 @@ def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
             c_rev[i] = a_rev[i]
         else:
             c_rev[i] = max(a_rev[i], b_rev[i])
-        if a_rev[i] != 1 and b_rev[i] != 1:
-            raise IndexingError(f"Broadcast failure {a} {b}")
-        if b_rev[i] != c_rev[i] and b_rev[i] != 1:
-            raise IndexingError(f"Broadcast failure {a} {b}")
+            if a_rev[i] != c_rev[i] and a_rev[i] != 1:
+                raise IndexingError(f"Broadcast failure {a} {b}")
+            if b_rev[i] != c_rev[i] and b_rev[i] != 1:
+                raise IndexingError(f"Broadcast failure {a} {b}")
     return tuple(reversed(c_rev))
 
 
