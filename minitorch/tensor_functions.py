@@ -225,10 +225,11 @@ class Sum(Function):
             return grad_output * minitorch.ones(t1_shape, backend=grad_output.backend)
         else:
             # Adjust grad_output shape and expand
-            dim = int(dim.item())
+            dim = int(dim)
             shape = list(t1_shape)
             shape[dim] = 1
-            return grad_output.view(*shape).expand(*t1_shape)
+            grad_output = grad_output.view(*shape)
+            return grad_output.expand(*t1_shape)
 
     @classmethod
     def apply(cls, *vals: Tensor) -> Tensor:
