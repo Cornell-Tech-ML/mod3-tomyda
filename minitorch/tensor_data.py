@@ -45,8 +45,8 @@ def index_to_position(index: Index, strides: Strides) -> int:
 
     """
     position = 0
-    for idx, stride in zip(index, strides):
-        position += idx * stride
+    for ind, stride in zip(index, strides):
+        position += ind * stride
     return position
 
 
@@ -93,7 +93,6 @@ def broadcast_index(
             out_index[i] = big_index[i + (len(big_shape) - len(shape))]
         else:
             out_index[i] = 0
-    return None
 
 
 def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
@@ -110,17 +109,23 @@ def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
         IndexingError : if cannot broadcast
 
     """
-    result_shape = []
-    len1, len2 = len(shape1), len(shape2)
-    max_len = max(len1, len2)
-    for i in range(1, max_len + 1):
-        dim1 = shape1[-i] if i <= len1 else 1
-        dim2 = shape2[-i] if i <= len2 else 1
-        if dim1 == dim2 or dim1 == 1 or dim2 == 1:
-            result_shape.append(max(dim1, dim2))
+    a, b = shape1, shape2
+    m = max(len(a), len(b))
+    c_rev = [0] * m
+    a_rev = list(reversed(a))
+    b_rev = list(reversed(b))
+    for i in range(m):
+        if i >= len(a):
+            c_rev[i] = b_rev[i]
+        elif i >= len(b):
+            c_rev[i] = a_rev[i]
         else:
-            raise IndexingError(f"Shapes {shape1} and {shape2} are not broadcastable")
-    return tuple(reversed(result_shape))
+            c_rev[i] = max(a_rev[i], b_rev[i])
+        if a_rev[i] != 1 and b_rev[i] != 1:
+            raise IndexingError(f"Broadcast failure {a} {b}")
+        if b_rev[i] != c_rev[i] and b_rev[i] != 1:
+            raise IndexingError(f"Broadcast failure {a} {b}")
+    return tuple(reversed(c_rev))
 
 
 def strides_from_shape(shape: UserShape) -> UserStrides:
@@ -255,11 +260,11 @@ class TensorData:
         ), f"Must give a position to each dimension. Shape: {self.shape} Order: {order}"
 
         # Permute the shape and strides according to the order
-        new_shape = tuple(self.shape[i] for i in order)
-        new_strides = tuple(self.strides[i] for i in order)
-
-        # Return a new TensorData instance with the permuted shape and strides
-        return TensorData(self._storage, new_shape, new_strides)
+        return TensorData(
+            self._storage,
+            tuple([self.shape[o] for o in order]),
+            tuple([self._strides[o] for o in order]),
+        )
 
     def to_string(self) -> str:
         """Convert to string"""

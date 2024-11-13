@@ -231,16 +231,29 @@ class Sum(Function):
             return grad_output * minitorch.ones(t1_shape, backend=grad_output.backend)
 
     @classmethod
-    def apply(cls, t1: Tensor, dim: Optional[int] = None) -> Tensor:
+    def apply(cls, *vals: Tensor) -> Tensor:
         """Custom apply method to handle dim as an int"""
-        need_grad = t1.requires_grad()
+        raw_vals = []
+        need_grad = False
+        for v in vals:
+            if v.requires_grad():
+                need_grad = True
+            raw_vals.append(v.detach())
+
+        # Create the context.
         ctx = Context(not need_grad)
-        raw_t1 = t1.detach()
-        c = cls.forward(ctx, raw_t1, dim)
+
+        # Call forward with the variables.
+        c = cls._forward(ctx, *raw_vals)
+        # assert isinstance(c, Tensor), "Expected return type Tensor got %s" % (
+        #     type(c)
+        # )
+
+        # Create a new variable from the result with a new history.
         back = None
         if need_grad:
-            back = minitorch.History(cls, ctx, (t1,))
-        return minitorch.Tensor(c._tensor, back, backend=t1.backend)
+            back = minitorch.History(cls, ctx, vals)
+        return minitorch.Tensor(c._tensor, back, backend=c.backend)
 
 
 class LT(Function):
@@ -277,17 +290,9 @@ class EQ(Function):
 
 class IsClose(Function):
     @staticmethod
-    def forward(ctx: Context, t1: Tensor, t2: Tensor) -> Tensor:
+    def forward(ctx: Context, a: Tensor, b: Tensor) -> Tensor:
         """Element-wise closeness check."""
-        return t1.f.is_close_zip(t1, t2)
-
-    @staticmethod
-    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
-        """No backward pass for IsClose (zero gradients)."""
-        t1_shape, t2_shape = ctx.saved_values
-        grad_t1 = minitorch.zeros(t1_shape, backend=grad_output.backend)
-        grad_t2 = minitorch.zeros(t2_shape, backend=grad_output.backend)
-        return grad_t1, grad_t2
+        return a.f.is_close_zip(a, b)
 
 
 class Permute(Function):
