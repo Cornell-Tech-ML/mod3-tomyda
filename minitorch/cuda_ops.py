@@ -94,6 +94,8 @@ class CudaOps(TensorOps):
         f = tensor_reduce(cufn)
 
         def ret(a: Tensor, dim: int) -> Tensor:
+            if isinstance(dim, Tensor):
+                dim = int(dim.item())  # Convert Tensor to integer
             out_shape = list(a.shape)
             out_shape[dim] = (a.shape[dim] - 1) // 1024 + 1
             out_a = a.zeros(tuple(out_shape))
