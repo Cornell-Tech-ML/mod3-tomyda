@@ -74,31 +74,7 @@ exclude = [
     "**/docs/**/*",
 ]
 
-ignore = [
-    "ANN101",
-    "ANN401",
-    "N801",
-    "E203",
-    "E266",
-    "E501",
-    "E741",
-    "N803",
-    "N802",
-    "N806",
-    "D400",
-    "D401",
-    "D105",
-    "D415",
-    "D402",
-    "D205",
-    "D100",
-    "D101",
-    "D107",
-    "D213",
-    "ANN204",
-    "ANN102",
-]
-select = ["D", "E", "F", "N", "ANN"]
+[tool.ruff.lint]
 fixable = [
     "A",
     "B",
@@ -145,7 +121,31 @@ fixable = [
     "UP",
     "YTT",
 ]
+ignore = [
+    "ANN101",
+    "ANN401",
+    "N801",
+    "E203",
+    "E266",
+    "E501",
+    "E741",
+    "N803",
+    "N802",
+    "N806",
+    "D400",
+    "D401",
+    "D105",
+    "D415",
+    "D402",
+    "D205",
+    "D100",
+    "D101",
+    "D107",
+    "D213",
+    "ANN204",
+    "ANN102",
+]
+select = ["D", "E", "F", "N", "ANN"]
 unfixable = []
 
-[tool.ruff.extend-per-file-ignores]
-"tests/**/*.py" = ["D"]
+extend-per-file-ignores = { "tests/**/*.py" = ["D"] }
