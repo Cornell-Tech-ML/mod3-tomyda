@@ -164,7 +164,9 @@ def relu(x: float) -> float:
     """
     return x if x > 0 else 0.0
 
+
 EPS = 1e-6
+
 
 def log(x: float) -> float:
     """Calculate the natural logarithm of x.
