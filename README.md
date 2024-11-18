@@ -1,37 +1,5 @@
 # MiniTorch Module 3
 
-<img src="https://minitorch.github.io/minitorch.svg" width="50%">
-
-* Docs: https://minitorch.github.io/
-
-* Overview: https://minitorch.github.io/module3.html
-
-
-You will need to modify `tensor_functions.py` slightly in this assignment.
-
-* Tests:
-
-```
-python run_tests.py
-```
-
-* Note:
-
-Several of the tests for this assignment will only run if you are on a GPU machine and will not
-run on github's test infrastructure. Please follow the instructions to setup up a colab machine
-to run these tests.
-
-This assignment requires the following files from the previous assignments. You can get these by running
-
-```bash
-python sync_previous_module.py previous-module-dir current-module-dir
-```
-
-The files that will be synced are:
-
-        minitorch/tensor_data.py minitorch/tensor_functions.py minitorch/tensor_ops.py minitorch/operators.py minitorch/scalar.py minitorch/scalar_functions.py minitorch/module.py minitorch/autodiff.py minitorch/module.py project/run_manual.py project/run_scalar.py project/run_tensor.py minitorch/operators.py minitorch/module.py minitorch/autodiff.py minitorch/tensor.py minitorch/datasets.py minitorch/testing.py minitorch/optim.py
-
-
 # Task 3.1 & 3.2:
 
 ```
@@ -338,4 +306,61 @@ Allocation hoisting:
 No allocation hoisting found
 None
 (.venv) ➜  mod3-tomyda git:(master)
+```
+
+# Task 1.5
+
+```
+/usr/local/lib/python3.10/dist-packages/numba/cuda/dispatcher.py:536: NumbaPerformanceWarning: Grid size 2 will likely result in GPU under-utilization due to low occupancy.
+  warn(NumbaPerformanceWarning(msg))
+Epoch  0  loss  8.601916550344345 correct 24
+Epoch  10  loss  5.903085305333699 correct 40
+Epoch  20  loss  3.9540731195480756 correct 28
+Epoch  30  loss  5.958931651707339 correct 38
+Epoch  40  loss  4.9083450022229105 correct 45
+Epoch  50  loss  3.4842004257185235 correct 48
+Epoch  60  loss  4.105810530313646 correct 49
+Epoch  70  loss  2.1675764480305526 correct 49
+Epoch  80  loss  6.386501474898881 correct 40
+Epoch  90  loss  2.1235394516275274 correct 46
+Epoch  100  loss  2.7509080787127584 correct 41
+Epoch  110  loss  2.4099218100987194 correct 49
+Epoch  120  loss  1.9029156360383757 correct 47
+Epoch  130  loss  2.6736281973798026 correct 43
+Epoch  140  loss  1.4647704991273875 correct 50
+Epoch  150  loss  0.9940440249013185 correct 50
+Epoch  160  loss  0.8463064010053025 correct 50
+Epoch  170  loss  0.9008822897446384 correct 50
+Epoch  180  loss  0.4269071144209959 correct 50
+Epoch  190  loss  1.3392777064698498 correct 49
+Epoch  200  loss  0.44995852962234023 correct 50
+Epoch  210  loss  0.6132606501091107 correct 50
+Epoch  220  loss  0.6481292184622426 correct 50
+Epoch  230  loss  0.4668689917965029 correct 50
+Epoch  240  loss  1.0415120735405605 correct 50
+Epoch  250  loss  1.1070372755282887 correct 50
+Epoch  260  loss  1.0953808801250569 correct 50
+Epoch  270  loss  0.3863824621665981 correct 50
+Epoch  280  loss  0.53855786908355 correct 49
+Epoch  290  loss  1.0789959622877634 correct 50
+Epoch  300  loss  0.9202270967286595 correct 50
+Epoch  310  loss  1.1822923582168685 correct 49
+Epoch  320  loss  0.3166947814292042 correct 50
+Epoch  330  loss  1.129788578646751 correct 49
+Epoch  340  loss  0.28856512147511193 correct 50
+Epoch  350  loss  0.23774834523778185 correct 50
+Epoch  360  loss  0.20473281792945816 correct 50
+Epoch  370  loss  0.3525654019704084 correct 50
+Epoch  380  loss  0.5710736709517492 correct 50
+Epoch  390  loss  0.7725176368487535 correct 50
+Epoch  400  loss  0.22288026839203723 correct 50
+Epoch  410  loss  0.2780132844404524 correct 50
+Epoch  420  loss  1.0588894348033184 correct 49
+Epoch  430  loss  0.7711781169664963 correct 50
+Epoch  440  loss  0.7818209851469873 correct 50
+Epoch  450  loss  0.6597907129363779 correct 50$$
+Epoch  460  loss  0.1380080270663799 correct 50
+Epoch  470  loss  0.14368237061744552 correct 50
+Epoch  480  loss  0.02601843434120959 correct 50
+Epoch  490  loss  0.10969056399590718 correct 50
 ```
