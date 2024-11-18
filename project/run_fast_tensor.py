@@ -1,9 +1,7 @@
 import random
-import time
-
 import numba
-
 import minitorch
+import time
 
 datasets = minitorch.datasets
 FastTensorBackend = minitorch.TensorBackend(minitorch.FastOps)
@@ -11,10 +9,8 @@ if numba.cuda.is_available():
     GPUBackend = minitorch.TensorBackend(minitorch.CudaOps)
 
 
-def default_log_fn(epoch, total_loss, correct, losses, start_time):
-    elapsed_time = time.time() - start_time
-    print(f"Epoch {epoch} | Loss: {total_loss:.4f} | Correct: {correct} | Time: {elapsed_time:.4f} sec")
-
+def default_log_fn(epoch, total_loss, correct, losses, epoch_time):
+    print(f"Epoch {epoch} _ Loss: {total_loss:.4f} _ Correct: {correct} (Time: {epoch_time:.4f} sec)")
 
 def RParam(*shape, backend):
     r = minitorch.rand(shape, backend=backend) - 0.5
@@ -31,11 +27,10 @@ class Network(minitorch.Module):
         self.layer3 = Linear(hidden, 1, backend)
 
     def forward(self, x):
-        # Implementing the forward pass
-        x = self.layer1.forward(x).relu()
-        x = self.layer2.forward(x).relu()
-        x = self.layer3.forward(x).sigmoid()
-        return x
+        # TODO: Implement for Task 3.5.
+        y = self.layer1.forward(x).relu()
+        z = self.layer2.forward(y).relu()
+        return self.layer3.forward(z).sigmoid()
 
 
 class Linear(minitorch.Module):
@@ -48,7 +43,7 @@ class Linear(minitorch.Module):
         self.out_size = out_size
 
     def forward(self, x):
-        # Implementing the forward pass
+        # TODO: Implement for Task 3.5.
         return x @ self.weights.value + self.bias.value
 
 
@@ -64,31 +59,53 @@ class FastTrain:
     def run_many(self, X):
         return self.model.forward(minitorch.tensor(X, backend=self.backend))
 
-    def train(self, data, learning_rate, max_epochs=500):
-        start_time = time.time()
+    def train(self, data, learning_rate, max_epochs=500, log_fn=default_log_fn):
+        self.model = Network(self.hidden_layers, self.backend)
+        optim = minitorch.SGD(self.model.parameters(), learning_rate)
+        BATCH = 10
+        losses = []
+        epoch_times = []  # Initialize list to store epoch times
 
-        for epoch in range(1, max_epochs + 1):
-            # Forward pass and loss calculation
-            out = self.model.forward(data.X).view(data.N)
-            y = data.y
-            probs = (out * y) + (out - 1.0) * (y - 1.0)
-            loss = -probs.log().sum()
 
-            # Backward pass and parameter update
-            loss.backward()
-            for p in self.model.parameters():
-                if p.grad is not None:
-                    p.data -= learning_rate * (p.grad / float(data.N))
-                    p.grad.zero_()
+        for epoch in range(max_epochs):
+            start_time = time.time()  # Start timer for the epoch
+            total_loss = 0.0
+            c = list(zip(data.X, data.y))
+            random.shuffle(c)
+            X_shuf, y_shuf = zip(*c)
+
+            for i in range(0, len(X_shuf), BATCH):
+                optim.zero_grad()
+                X = minitorch.tensor(X_shuf[i : i + BATCH], backend=self.backend)
+                y = minitorch.tensor(y_shuf[i : i + BATCH], backend=self.backend)
+                out = self.model.forward(X).view(y.shape[0])
+                prob = (out * y) + (out - 1.0) * (y - 1.0)
+                loss = -prob.log()
+                (loss / y.shape[0]).sum().view(1).backward()
+
+                total_loss = loss.sum().view(1)[0]
+
+                # Update
+                optim.step()
+
+            end_time = time.time()
+            epoch_time = end_time - start_time
+            epoch_times.append(epoch_time)
+            losses.append(total_loss)
 
             # Logging
-            pred = out > 0.5
-            correct = ((y == 1) * pred).sum() + ((y == 0) * (~pred)).sum()
-            loss_num = loss.item()
-
             if epoch % 10 == 0 or epoch == max_epochs:
-                default_log_fn(epoch, loss_num, correct.item(), [], start_time)
-                start_time = time.time()  # Reset start time for the next epoch
+                X = minitorch.tensor(data.X, backend=self.backend)
+                y = minitorch.tensor(data.y, backend=self.backend)
+
+                out = self.model.forward(X).view(y.shape[0])
+                y2 = minitorch.tensor(data.y)
+                correct = int(((out.detach() > 0.5) == y2).sum()[0])
+                log_fn(epoch, total_loss, correct, losses, epoch_time)  # Pass epoch_time
+
+        # Calculate average epoch time
+        average_epoch_time = sum(epoch_times) / len(epoch_times)
+        print(f"\nAverage Time per Epoch: {average_epoch_time:.4f} sec")
 
 
 if __name__ == "__main__":
