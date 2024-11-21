@@ -312,10 +312,37 @@ None
 
 ### 3.4 Cuda Matrix Multiply vs Naive approach Performance
 
+![alt text](image.png)
 
-
-
-
+```
+Size: 16
+    fast: 0.00034
+    gpu: 0.00432
+Size: 32
+    fast: 0.00092
+    gpu: 0.00470
+Size: 64
+    fast: 0.00346
+    gpu: 0.00695
+Size: 128
+    fast: 0.01669
+    gpu: 0.01522
+Size: 256
+    fast: 0.09938
+    gpu: 0.05426
+Size: 512
+    fast: 1.01737
+    gpu: 0.22840
+Size: 1024
+    fast: 8.54689
+    gpu: 1.06219
+Size: 2048
+    fast: 154.31738
+    gpu: 4.19271
+Size: 4096
+    fast: 1673.25711
+    gpu: 19.84164
+```
 
 
 # Task 3.5

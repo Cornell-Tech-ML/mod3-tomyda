@@ -402,31 +402,37 @@ def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
         size (int): size of the square
 
     """
+    # What we are going to do its the following:
+    # 1. The shared memory arrays are going to be 32x32
+    # 2. We are going to load the elements into the shared memory
+    # 3. We are going to perform the computation on the tile
+    # 4. We are going to write the result to the global memory
+
     # Shared memory arrays (maximum size 32x32)
-    a_shared = cuda.shared.array((32, 32), numba.float64)
-    b_shared = cuda.shared.array((32, 32), numba.float64)
+    MEMORY_SIZE = 32
+    first_shared = cuda.shared.array((MEMORY_SIZE, MEMORY_SIZE), numba.float64)
+    second_shared = cuda.shared.array((MEMORY_SIZE, MEMORY_SIZE), numba.float64)
+    tx = cuda.threadIdx.x
+    ty = cuda.threadIdx.y
 
-    tx = cuda.threadIdx.x  # Row index
-    ty = cuda.threadIdx.y  # Column index
-
-    # Load elements into shared memory
+    # Load the elements into our shared memory
     if tx < size and ty < size:
         a_idx = tx * size + ty
         b_idx = tx * size + ty
-        a_shared[tx, ty] = a[a_idx]
-        b_shared[tx, ty] = b[b_idx]
+        first_shared[tx, ty] = a[a_idx]
+        second_shared[tx, ty] = b[b_idx]
     else:
-        a_shared[tx, ty] = 0.0
-        b_shared[tx, ty] = 0.0
+        first_shared[tx, ty] = 0.0
+        second_shared[tx, ty] = 0.0
 
-    # Synchronize threads after loading data
+    # Synchronize the threads after loading data
     cuda.syncthreads()
 
-    # Perform matrix multiplication
+    # Do the actual matrix multiplication
     if tx < size and ty < size:
         sum = 0.0
         for k in range(size):
-            sum += a_shared[tx, k] * b_shared[k, ty]
+            sum += first_shared[tx, k] * second_shared[k, ty]
 
         # Write the result to the output tensor
         out_idx = tx * size + ty
@@ -476,69 +482,76 @@ def _tensor_matrix_multiply(
     Returns:
         None : Fills in `out`
     """
-    # Calculate batch strides
-    a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
-    b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
+    # What we are going to do its the following:
+    # 1. Calculate batch strides
+    # 2. Get batch index
+    # 3. Define tile size
+    # 4. Allocate shared memory
+    # 5. Compute global thread indices
+    # 6. Perform computation on the tile
+    # 7. Write the result to global memory
 
-    # Get batch index
-    batch_idx = cuda.blockIdx.z
+    # Calculate the batch strides
+    first_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
+    second_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
 
-    # Define tile size
+    # Get the batch indexes
+    batch_index = cuda.blockIdx.z
+
+    # Define the tile size
     TILE_SIZE = 32
 
-    # Allocate shared memory
-    shared_a = cuda.shared.array((TILE_SIZE, TILE_SIZE), numba.float64)
-    shared_b = cuda.shared.array((TILE_SIZE, TILE_SIZE), numba.float64)
+    # Allocate the shared memories
+    first_shared = cuda.shared.array((TILE_SIZE, TILE_SIZE), numba.float64)
+    second_shared = cuda.shared.array((TILE_SIZE, TILE_SIZE), numba.float64)
 
-    # Compute global thread indices
-    row = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
-    col = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
+    # Compute the global thread indices
+    r = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
+    c = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
 
-    # Compute local thread indices within the block
+    # Compute the local indices in threads within the blocks
     local_row = cuda.threadIdx.x
-    local_col = cuda.threadIdx.y
+    local_columns = cuda.threadIdx.y
 
-    # Initialize accumulator
+    # Initialize the accumulator
     acc = 0.0
-
-    # Loop over tiles
-    for tile_idx in range(0, a_shape[2], TILE_SIZE):
+    # Loop over our tiles
+    for tile_index in range(0, a_shape[2], TILE_SIZE):
         # Load data into shared memory from a_storage
-        if row < a_shape[1] and (tile_idx + local_col) < a_shape[2]:
+        if r < a_shape[1] and (tile_index + local_columns) < a_shape[2]:
             a_index = (
-                batch_idx * a_batch_stride
-                + row * a_strides[1]
-                + (tile_idx + local_col) * a_strides[2]
+                batch_index * first_batch_stride
+                + r * a_strides[1]
+                + (tile_index + local_columns) * a_strides[2]
             )
-            shared_a[local_row, local_col] = a_storage[a_index]
+            first_shared[local_row, local_columns] = a_storage[a_index]
         else:
-            shared_a[local_row, local_col] = 0.0
-
-        # Load data into shared memory from b_storage
-        if (tile_idx + local_row) < b_shape[1] and col < b_shape[2]:
+            first_shared[local_row, local_columns] = 0.0
+        # Load the data into shared memory from b_storage
+        if (tile_index + local_row) < b_shape[1] and c < b_shape[2]:
             b_index = (
-                batch_idx * b_batch_stride
-                + (tile_idx + local_row) * b_strides[1]
-                + col * b_strides[2]
+                batch_index * second_batch_stride
+                + (tile_index + local_row) * b_strides[1]
+                + c * b_strides[2]
             )
-            shared_b[local_row, local_col] = b_storage[b_index]
+            second_shared[local_row, local_columns] = b_storage[b_index]
         else:
-            shared_b[local_row, local_col] = 0.0
+            second_shared[local_row, local_columns] = 0.0
 
         # Synchronize threads to ensure all data is loaded
         cuda.syncthreads()
 
         # Perform computation on the tile
         for k in range(TILE_SIZE):
-            acc += shared_a[local_row, k] * shared_b[k, local_col]
+            acc += first_shared[local_row, k] * second_shared[k, local_columns]
 
         # Synchronize before loading next tile
         cuda.syncthreads()
 
-    # Write the result to global memory
-    if row < out_shape[1] and col < out_shape[2]:
+    # Write the result to our global memory
+    if r < out_shape[1] and c < out_shape[2]:
         out_index = (
-            batch_idx * out_strides[0] + row * out_strides[1] + col * out_strides[2]
+            batch_index * out_strides[0] + r * out_strides[1] + c * out_strides[2]
         )
         out[out_index] = acc
 
