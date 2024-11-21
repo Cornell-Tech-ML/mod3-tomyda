@@ -1,4 +1,5 @@
 # MiniTorch Module 3
+## Tomas De Angelis td442@cornell.edu
 
 # Task 3.1:
 
