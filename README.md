@@ -308,7 +308,17 @@ None
 (.venv) ➜  mod3-tomyda git:(master)
 ```
 
-# Task 1.5
+# Paralelization 3.4
+
+### 3.4 Cuda Matrix Multiply vs Naive approach Performance
+
+
+
+
+
+
+
+# Task 3.5
 
 `run_fast_tensor.py --BACKEND cpu --HIDDEN 100 --DATASET simple --RATE 0.05`
 ```
