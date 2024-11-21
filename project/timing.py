@@ -1,6 +1,7 @@
 import minitorch
 import time
 import numpy as np
+import matplotlib.pyplot as plt
 
 FastTensorBackend = minitorch.TensorBackend(minitorch.FastOps)
 GPUBackend = minitorch.TensorBackend(minitorch.CudaOps)
@@ -20,6 +21,23 @@ def run_matmul(backend: minitorch.TensorBackend, size: int = 16) -> None:
     y = minitorch.rand((batch_size, size, size), backend=backend)
     z = x @ y  # noqa: F841
 
+def plot_results(results):
+    sizes = list(results.keys())
+    fast_times = [results[size]['fast'] for size in sizes]
+    gpu_times = [results[size]['gpu'] for size in sizes]
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(sizes, fast_times, label='Fast', marker='o')
+    plt.plot(sizes, gpu_times, label='GPU', marker='o')
+    plt.xlabel('Matrix Size')
+    plt.ylabel('Time (seconds)')
+    plt.title('Matrix Multiplication Performance')
+    plt.legend()
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.grid(True)
+    plt.show()
+
 
 if __name__ == "__main__":
     # Warmup
@@ -28,7 +46,7 @@ if __name__ == "__main__":
 
     ntrials = 3
     times = {}
-    for size in [64, 128, 256, 512, 1024]:
+    for size in [16, 32, 64, 128, 256, 512, 1024, 2048, 4096]:
         print(f"Running size {size}")
         times[size] = {}
         simple_times = []
@@ -59,3 +77,7 @@ if __name__ == "__main__":
         print(f"Size: {size}")
         for b, t in stimes.items():
             print(f"    {b}: {t:.5f}")
+
+    # Assuming `results` is the dictionary returned by `run_timing_tests`
+    results = run_timing_tests(backend)
+    plot_results(results)

@@ -1,6 +1,6 @@
 # MiniTorch Module 3
 
-# Task 3.1 & 3.2:
+# Task 3.1:
 
 ```
 (.venv) ➜  mod3-tomyda git:(master) python project/parallel_check.py
